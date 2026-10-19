@@ -230,11 +230,57 @@ That is an exhausted devnet faucet, not a defect in the program. It is also the 
 suite is written against the **chain** clock rather than the host clock: when it does run, it has to
 run somewhere the clock is real.
 
+#### The local-validator route, and the wall it hits on Windows
+
+The obvious escape — stop depending on a shared, rate-limited faucet and run a local validator — was
+attempted, and it is blocked by something narrower and more permanent. The whole toolchain installs
+**without a compiler**: the Agave release publishes a prebuilt
+`solana-release-x86_64-pc-windows-msvc.tar.bz2` (110 MB, sha256 verified) which unpacks to
+`solana-test-validator.exe`, `solana.exe`, `cargo-build-sbf.exe`, `solana-keygen.exe` and
+`spl-token.exe`. All of them run, and `cargo-build-sbf` already bundles `platform-tools v1.57`. So
+the *runtime* side of this plan is fine — a local chain with unlimited airdrops is genuinely
+available.
+
+The **build** is what fails, and it fails on a detail worth writing down:
+
+- Anchor needs proc-macros (`syn`, `quote`, `proc-macro2`, `serde`). `cargo-build-sbf` compiles
+  those as **native host executables that run during compilation**, so they need a *host* linker —
+  the SBF linker is irrelevant to them.
+- `cargo-build-sbf` resolves its toolchain through rustup using a `+solana` override, landing on
+  `1.95.0-sbpf-solana-v1.57`, whose host is `x86_64-pc-windows-msvc`.
+- The Solana distribution publishes **no gnu-hosted toolchain**:
+  `rustup toolchain install solana-x86_64-pc-windows-gnu` →
+  `error: invalid toolchain name: 'solana-x86_64-pc-windows-gnu'`.
+- So an MSVC linker is mandatory. On this machine `link.exe` resolves to
+  `C:\Users\hamza\AppData\Local\hermes\git\usr\bin\link.exe` — **Git for Windows' coreutils `link`** —
+  which fails with `link: extra operand … Try 'link --help'`. There is no Visual Studio, no
+  `Windows Kits` directory, and no MSVC at all, so that shadowing is not the problem, only the
+  symptom: `error: linking with link.exe failed: exit code: 1`.
+
+Installing the GNU Rust toolchain plus its `rust-mingw` component *does* provide a self-contained
+host linker — and it still does not help, because the `+solana` override chooses the host, and that
+host is msvc. The `metadata ok, 2158 chars` line confirms the earlier failure (host `cargo` missing
+entirely, for `cargo metadata`) was fixed and is no longer the blocker.
+
+**The fix is one of two things, and both are environment work rather than program work:** install
+the MSVC C++ build tools (~2 GB, needs administrator), or build on Linux. That is why the honest
+artefact here is a clean compile plus a suite that is known to load and start — not a green run.
+
 **One real portability fix came out of this.** The suite used `chai`, which is *not* in Playground's
 package registry — a file importing it cannot run there at all, which would have made the only
 no-toolchain runner in existence useless. The seven assertion methods this suite actually uses are
 now implemented locally inside the test file, so the same file runs unchanged on a local validator
-and in the browser.
+and in the browser. `chai` and `@types/chai` are no longer declared in `package.json` or
+`tsconfig.json`, so the configuration matches the code instead of outliving it.
+
+**A second portability fix came out of the same attempt.** The suite built its Program from
+`anchor.workspace.Escrow` — a global that the **Anchor CLI injects** while it drives `anchor test`.
+Outside that CLI the workspace is empty, and the suite dies before a single test executes, which is
+the worst possible failure mode: it looks like a broken program. The Program is now built from the
+committed IDL when no CLI is in charge — same program, same programId, same instruction set, only
+the source of the idl object changes. `tools/make-target-types.js` regenerates the `target/` type
+surface from that IDL for anyone who has just cloned: `target/` is a build output, so without this
+the import of `../target/types/escrow` is missing on every fresh clone.
 
 ### Locally
 
@@ -242,6 +288,12 @@ and in the browser.
 anchor build
 anchor test
 ```
+
+On Windows this additionally needs the **MSVC C++ build tools**. Not for the program — for the host
+proc-macro build-scripts that Anchor compiles along the way. With the SBF toolchain installed
+perfectly and no MSVC present, the build still stops at
+`error: linking with link.exe failed: exit code: 1`, because `link.exe` on this machine is Git for
+Windows' coreutils `link`. The section above has the full diagnosis.
 
 Test durations: two tests deliberately wait on the **validator's** clock rather than the host clock,
 so the deadline path is genuinely exercised. Expect roughly 20 seconds added.
@@ -257,6 +309,7 @@ programs/escrow/src/lib.rs        the program
 tests/escrow.ts                   18 tests
 idl/escrow.json                   IDL from the verified clean build (Solana Playground, 2026-10-19)
 tools/api-crosscheck.js           structural + API drift checker (no toolchain needed)
+tools/make-target-types.js        rebuilds target/ from idl/ so a fresh clone can run the tests
 ```
 
 Run the cross-checker on any change:

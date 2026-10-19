@@ -14,7 +14,7 @@
 // kind of test that teaches you nothing.
 import * as anchor from "@coral-xyz/anchor";
 import { Program, BN } from "@coral-xyz/anchor";
-import { Escrow } from "../target/types/escrow";
+import { Escrow, IDL } from "../target/types/escrow";
 import {
   createMint,
   createAccount,
@@ -103,7 +103,18 @@ describe("escrow", function () {
 
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
-  const program = anchor.workspace.Escrow as Program<Escrow>;
+
+  // Must match `declare_id!` in programs/escrow/src/lib.rs and [programs.*] in Anchor.toml.
+  // The generated IDL carries no `address` field, so the id cannot be read out of it.
+  const PROGRAM_ID = new PublicKey("GPmJtpLs7u7BCfUHjRyaffjPSKuJjEjLY1qztzgtVgpC");
+
+  // `anchor.workspace` is injected by the Anchor CLI while it drives `anchor test`. Outside that
+  // CLI - a bare `mocha -r ts-node/register` against a local validator, or a hosted runner - the
+  // workspace is empty and the suite dies before a single test executes. The IDL fully describes the
+  // program's type surface, so build the Program from it when no CLI is in charge. Same program,
+  // same programId, same instruction set: only the source of the idl object changes.
+  const workspace = (anchor.workspace ?? {}) as unknown as Record<string, Program<Escrow>>;
+  const program = workspace.Escrow ?? new Program<Escrow>(IDL, PROGRAM_ID, provider);
   const connection = provider.connection;
   const client = (provider.wallet as anchor.Wallet).payer;
 
