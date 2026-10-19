@@ -1,0 +1,470 @@
+{
+  "version": "0.1.0",
+  "name": "escrow",
+  "instructions": [
+    {
+      "name": "createEscrow",
+      "accounts": [
+        {
+          "name": "client",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "escrow",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "clientTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "milestones",
+          "type": "u8"
+        },
+        {
+          "name": "deadline",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "acceptEscrow",
+      "accounts": [
+        {
+          "name": "freelancer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "escrow",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "approveMilestone",
+      "accounts": [
+        {
+          "name": "client",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "escrow",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "freelancer",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "freelancerTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancelEscrow",
+      "accounts": [
+        {
+          "name": "client",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "escrow",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "clientTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claimUnreviewed",
+      "accounts": [
+        {
+          "name": "freelancer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "escrow",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "freelancerTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "closeEscrow",
+      "accounts": [
+        {
+          "name": "client",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "escrow",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Escrow",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "client",
+            "type": "publicKey"
+          },
+          {
+            "name": "freelancer",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "mint",
+            "type": "publicKey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "milestones",
+            "type": "u8"
+          },
+          {
+            "name": "approved",
+            "type": "u8"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": "EscrowStatus"
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vaultBump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "EscrowStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Completed"
+          },
+          {
+            "name": "Cancelled"
+          }
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "name": "EscrowCreated",
+      "fields": [
+        {
+          "name": "escrow",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "client",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "amount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "milestones",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "deadline",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "EscrowAccepted",
+      "fields": [
+        {
+          "name": "escrow",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "freelancer",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "MilestoneApproved",
+      "fields": [
+        {
+          "name": "escrow",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "paid",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "approved",
+          "type": "u8",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "EscrowCancelled",
+      "fields": [
+        {
+          "name": "escrow",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "refunded",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "UnreviewedClaimed",
+      "fields": [
+        {
+          "name": "escrow",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "claimed",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "EscrowClosed",
+      "fields": [
+        {
+          "name": "escrow",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "ZeroAmount",
+      "msg": "amount must be greater than zero"
+    },
+    {
+      "code": 6001,
+      "name": "NoMilestones",
+      "msg": "a job needs at least one milestone"
+    },
+    {
+      "code": 6002,
+      "name": "UnevenMilestones",
+      "msg": "amount must divide evenly by the milestone count, or the remainder would strand in the vault"
+    },
+    {
+      "code": 6003,
+      "name": "DeadlineInPast",
+      "msg": "deadline must be in the future"
+    },
+    {
+      "code": 6004,
+      "name": "NotOpen",
+      "msg": "escrow is not open"
+    },
+    {
+      "code": 6005,
+      "name": "NotActive",
+      "msg": "escrow is not active"
+    },
+    {
+      "code": 6006,
+      "name": "SelfDealing",
+      "msg": "client cannot also be the freelancer"
+    },
+    {
+      "code": 6007,
+      "name": "WrongFreelancer",
+      "msg": "only the escrow's freelancer may do this"
+    },
+    {
+      "code": 6008,
+      "name": "AlreadyAccepted",
+      "msg": "a freelancer has already accepted this escrow"
+    },
+    {
+      "code": 6009,
+      "name": "DeadlineNotReached",
+      "msg": "deadline has not passed yet"
+    },
+    {
+      "code": 6010,
+      "name": "NothingToClaim",
+      "msg": "nothing left to claim"
+    },
+    {
+      "code": 6011,
+      "name": "StillLive",
+      "msg": "escrow must be completed or cancelled before it can be closed"
+    },
+    {
+      "code": 6012,
+      "name": "VaultNotEmpty",
+      "msg": "vault still holds tokens - refusing to close and strand them"
+    }
+  ]
+}
