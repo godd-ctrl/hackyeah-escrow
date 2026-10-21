@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Milestone Escrow — HackYeah submission deck</title>
+<!--
+  PRINT-READY DECK. Open in Chrome, Ctrl+P, save as PDF, margins "None", background graphics ON.
+
+  WHY HTML AND NOT A SLIDE FILE.
+  A .pptx is a binary nobody can diff and that silently reflows on another machine. This is text: it
+  renders identically anywhere, it prints to a fixed 1280x720 page, and it can be edited in a text
+  editor. The page size below is exactly 16:9, so "save as PDF" produces ten landscape slides with no
+  cropping - not a scrolling web page that happens to print.
+
+  WHAT THIS DECK DOES NOT DO.
+  It does not claim a working deployment. The program builds and the app runs, but nothing is on
+  devnet at the time of writing, so slide 7 separates what is proven from what is not. A deck that
+  says "fully tested" when the tests have not run is a deck that lies to a judge who then opens the
+  repo, and the repo is the thing they can check.
+-->
+<style>
+  :root{
+    --bg:#0a0d14; --panel:#111725; --panel2:#0d1320; --line:#1e2a40; --line2:#2a3a58;
+    --ink:#e8eefc; --dim:#8fa0be; --dim2:#64748b;
+    --gold:#ffcc66; --green:#3ddc97; --red:#ff6b6b; --blue:#5aa9ff; --violet:#a78bfa;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact}
+  html,body{margin:0;background:#05070b;color:var(--ink);font-family:var(--sans)}
+  body{display:flex;flex-direction:column;align-items:center;gap:22px;padding:22px 0 60px}
+
+  .slide{
+    position:relative; width:1280px; height:720px; flex:0 0 auto; overflow:hidden;
+    background:
+      radial-gradient(760px 420px at 12% -8%, rgba(90,169,255,.10), transparent 62%),
+      radial-gradient(680px 420px at 92% 2%, rgba(167,139,250,.09), transparent 58%),
+      radial-gradient(900px 600px at 50% 110%, rgba(255,204,102,.05), transparent 60%),
+      var(--bg);
+    border-radius:10px; padding:54px 64px 50px; display:flex; flex-direction:column;
+    box-shadow:0 18px 50px rgba(0,0,0,.55);
+  }
+  .slide::after{ /* hairline frame, so a printed slide still has an edge on white paper */
+    content:""; position:absolute; inset:0; border-radius:10px; pointer-events:none;
+    border:1px solid rgba(255,255,255,.055);
+  }
+  .tagline{position:absolute;left:64px;bottom:26px;font-size:12px;color:var(--dim2);letter-spacing:.04em}
+  .pno{position:absolute;right:64px;bottom:26px;font-size:12px;color:var(--dim2);font-family:var(--mono)}
+
+  .kicker{font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);
+    font-weight:700;margin-bottom:14px}
+  h1{font-size:60px;line-height:1.03;letter-spacing:-.032em;margin:0 0 20px;font-weight:750}
+  h2{font-size:38px;line-height:1.08;letter-spacing:-.026em;margin:0 0 10px;font-weight:720}
+  h3{font-size:15px;margin:0 0 6px;font-weight:680;letter-spacing:-.01em}
+  p{margin:0;font-size:16px;line-height:1.62;color:#c3cfe4}
+  .lede{font-size:19px;line-height:1.58;color:#b7c4db;max-width:80ch}
+  .dim{color:var(--dim)}
+  .small{font-size:13.5px;line-height:1.58;color:var(--dim)}
+  .mono{font-family:var(--mono)}
+
+  .grow{flex:1}
+  .row{display:flex;gap:16px}
+  .col{flex:1}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+    border-radius:14px;padding:18px 20px}
+  .card.gold{border-color:#4a3a17;background:linear-gradient(180deg,#191408,#12100a)}
+  .card.green{border-color:#17452f;background:linear-gradient(180deg,#0b1f19,#0a1712)}
+  .card.red{border-color:#4a2430;background:linear-gradient(180deg,#1d0d14,#150a10)}
+  .num{font-family:var(--mono);font-size:12px;color:var(--gold);letter-spacing:.1em;margin-bottom:8px}
+
+  .flow{display:flex;align-items:stretch;gap:0;margin-top:26px}
+  .step{flex:1;background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+    border-radius:12px;padding:16px 15px;position:relative}
+  .arrow{flex:0 0 34px;display:grid;place-items:center;color:var(--line2);font-size:20px}
+  .step .n{font-family:var(--mono);font-size:11px;color:var(--gold);letter-spacing:.12em}
+  .step h3{font-size:14.5px;margin:7px 0 6px}
+  .step p{font-size:12.5px;line-height:1.5;color:var(--dim)}
+
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim2);
+    font-weight:700;padding:0 12px 9px 0;border-bottom:1px solid var(--line)}
+  td{padding:10px 12px 10px 0;border-bottom:1px solid rgba(30,42,64,.6);vertical-align:top;line-height:1.45}
+  td.k{color:var(--ink);font-weight:640;white-space:nowrap}
+  td.v{color:#b3c1d8;font-size:13.5px}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:2.5px 9px;border-radius:999px;letter-spacing:.03em}
+  .pill.ok{color:#7ee7c0;background:#08201a;border:1px solid #17452f}
+  .pill.no{color:#ffb4b4;background:#20101a;border:1px solid #5a2630}
+  .pill.mid{color:#ffd48a;background:#1c1607;border:1px solid #4a3a17}
+
+  .cover{justify-content:center}
+  .cover h1{font-size:64px}
+  .badge{display:inline-flex;align-items:center;gap:9px;border:1px solid var(--line2);background:var(--panel2);
+    border-radius:999px;padding:7px 14px;font-size:12.5px;color:var(--dim);margin-bottom:26px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green)}
+  .covermeta{display:flex;gap:36px;margin-top:34px;font-size:13px;color:var(--dim2)}
+  .covermeta b{display:block;color:var(--ink);font-family:var(--mono);font-size:12.5px;margin-top:5px;font-weight:500}
+
+  .big{font-size:15.5px;line-height:1.6}
+  .quote{border-left:3px solid var(--gold);padding:4px 0 4px 18px;font-size:21px;line-height:1.5;
+    color:#dbe4f4;font-weight:520;letter-spacing:-.012em}
+  .screen{border:1px solid var(--line2);border-radius:12px;background:#0a1020;padding:14px 16px;
+    font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--dim)}
+  .screen b{color:var(--gold);font-weight:600}
+  .screen i{color:var(--green);font-style:normal}
+  ul{margin:0;padding-left:19px}
+  li{font-size:14px;line-height:1.62;color:#b9c6dd;margin-bottom:7px}
+  li b{color:var(--ink)}
+
+  .printhint{width:1280px;display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:11px 16px;font-size:12.5px;color:var(--dim)}
+  .printhint b{color:var(--gold);font-weight:650}
+  .printhint span{color:var(--dim2)}
+
+  @page{ size:1280px 720px; margin:0 }
+  @media print{
+    html,body{background:#05070b}
+    body{gap:0;padding:0}
+    .printhint{display:none !important}
+    .slide{border-radius:0;box-shadow:none;break-after:page;page-break-after:always;break-inside:avoid}
+    .slide:last-child{break-after:auto;page-break-after:auto}
+  }
+</style>
+</head>
+<body>
+
+<div class="printhint">
+  <b>Ctrl+P</b> &rarr; Destination <b>Save as PDF</b> &rarr; Margins <b>None</b> &rarr; Background graphics <b>ON</b>
+  <span>· 10 slides, 1280&times;720 · this bar is screen-only and does not print</span>
+</div>
+
+<!-- ============================================================ 1 · COVER -->
+<section class="slide cover">
+  <div class="badge"><span class="dot"></span> HackYeah 2026 · Superteam Poland Track · Trustless finance</div>
+  <h1>Get paid for work<br>without trusting<br>a platform with the money.</h1>
+  <p class="lede">A milestone escrow that lives entirely on Solana. The client locks the full amount in a
+  vault only the program can move. The freelancer sees it before starting. Silence has a deadline.</p>
+  <div class="covermeta">
+    <div>Program<b>GPmJtpLs7u7BCfUHjRyaffjPSKuJjEjLY1qztzgtVgpC</b></div>
+    <div>Program size<b>6 instructions · 1 account · 126 bytes</b></div>
+    <div>Stack<b>Anchor 0.30.1 · SPL Token · vanilla JS app</b></div>
+  </div>
+  <div class="tagline">Milestone Escrow</div>
+  <div class="pno">01 / 10</div>
+</section>
+
+<!-- ============================================================ 2 · PROBLEM -->
+<section class="slide">
+  <div class="kicker">The problem</div>
+  <h2>Two people who have never met<br>need a third one to hold the money.</h2>
+  <p class="lede" style="margin-top:14px">And that third party is not a neutral pipe. It is a business with
+  its own incentives, and every property that makes it useful is a property it can also abuse.</p>
+
+  <div class="row" style="margin-top:34px">
+    <div class="col card red">
+      <div class="num">01</div>
+      <h3>Custody</h3>
+      <p class="big">The platform holds the balance. Your money is a row in its database, withdrawable when
+      it decides — and frozen when it decides otherwise.</p>
+    </div>
+    <div class="col card red">
+      <div class="num">02</div>
+      <h3>Discretion</h3>
+      <p class="big">Disputes are settled by an employee reading messages, with no rule published in
+      advance and no appeal that is not the same employee again.</p>
+    </div>
+    <div class="col card red">
+      <div class="num">03</div>
+      <h3>Permission</h3>
+      <p class="big">Being paid requires an account, a country, and a reputation score. The work can be
+      finished and still not be payable.</p>
+    </div>
+  </div>
+
+  <p class="small" style="margin-top:auto">The fee is the visible cost. The invisible one is that neither
+  side can verify the other's money exists before the work starts — which is exactly why the platform
+  gets to charge it.</p>
+  <div class="tagline">Milestone Escrow</div>
+  <div class="pno">02 / 10</div>
+</section>
+
+<!-- ============================================================ 3 · MECHANISM -->
+<section class="slide">
+  <div class="kicker">The mechanism</div>
+  <h2>Four instructions replace the middleman.</h2>
+  <p class="lede" style="margin-top:10px">No custody, no dispute desk, no account. The rules are the
+  program, and the program is 126 bytes of readable state.</p>
+
+  <div class="flow">
+    <div class="step">
+      <div class="n">CREATE</div>
+      <h3>Client locks the whole job</h3>
+      <p>The amount moves from the client's token account into a vault PDA. The escrow account is derived
+      from <span class="mono">[client, mint, deadline]</span>, so the address is predictable before it exists.</p>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="n">ACCEPT</div>
+      <h3>Freelancer sees the money</h3>
+      <p>Accepting binds their key to the escrow. They are now working against a balance they can read
+      on-chain, not a promise.</p>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="n">APPROVE</div>
+      <h3>Each milestone releases</h3>
+      <p>One approval moves <span class="mono">amount / milestones</span>. Neither side can take the whole
+      pot early, and a remainder is rejected at creation so nothing can be stranded.</p>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="n">CLAIM</div>
+      <h3>Silence has a terminus</h3>
+      <p>If the client never reviews, the freelancer claims the balance after the deadline. The platform's
+      only irreplaceable job — deciding what happens when someone goes quiet — is now a timestamp.</p>
+    </div>
+  </div>
+
+  <div class="card gold" style="margin-top:26px">
+    <p class="big" style="color:#ffe1a3"><b>Why this is not just "escrow on a chain".</b> The deadline
+    branch is what makes it a <i>substitute</i> rather than a tool. Without it, a client who stops
+    answering keeps the money forever and you still need a platform to complain to.</p>
+  </div>
+
+  <div class="tagline">Milestone Escrow</div>
+  <div class="pno">03 / 10</div>
+</section>
+
+<!-- ============================================================ 4 · ENFORCEMENT -->
+<section class="slide">
+  <div class="kicker">What the program enforces</div>
+  <h2>Every promise is a constraint,<br>not a policy.</h2>
+
+  <table style="margin-top:26px">
+    <thead><tr><th style="width:270px">Property</th><th>How it is enforced</th></tr></thead>
+    <tbody>
+      <tr><td class="k">The client cannot take it back</td>
+        <td class="v">After acceptance the vault is owned by the escrow PDA. <span class="mono">cancel</span> requires
+        <span class="mono">status == Open</span>, so once work has started the refund path is closed to the client.</td></tr>
+      <tr><td class="k">The freelancer cannot take it early</td>
+        <td class="v"><span class="mono">claim_unreviewed</span> requires the on-chain clock to have passed
+        <span class="mono">deadline</span>. The clock is the chain's, not the server's.</td></tr>
+      <tr><td class="k">Only the right person acts</td>
+        <td class="v">Each instruction declares its signer; <span class="mono">has_one</span> binds the escrow to the
+        client, and the payout address is checked against <span class="mono">escrow.mint</span>.</td></tr>
+      <tr><td class="k">No funds are stranded</td>
+        <td class="v">Creation rejects an amount that does not divide evenly by the milestone count, so the vault
+        can always be emptied by approvals or by a claim.</td></tr>
+      <tr><td class="k">Two jobs cannot collide</td>
+        <td class="v">The PDA includes the client, the mint and the deadline, so a second job with identical terms
+        cannot silently overwrite the first.</td></tr>
+    </tbody>
+  </table>
+
+  <p class="small" style="margin-top:auto">Deliberately absent: an admin key, an upgrade-authority escape hatch in
+  the instruction set, and any instruction that can move the vault without either a milestone approval or a
+  passed deadline.</p>
+  <div class="tagline">Milestone Escrow</div>
+  <div class="pno">04 / 10</div>
+</section>
+
+<!-- ============================================================ 5 · APP -->
+<section class="slide">
+  <div class="kicker">The product</div>
+  <h2>It is a page you can open,<br>not a diagram of one.</h2>
+
+  <div class="row" style="margin-top:22px;gap:22px">
+    <div class="col" style="flex:1.15">
+      <p class="lede" style="font-size:17px">One file. No build step, no bundler, no npm install. Connect a
+      browser wallet, mint demo money, post a job, accept it from a second wallet, release it milestone by
+      milestone, and watch the escrow state change on the explorer.</p>
+      <ul style="margin-top:18px">
+        <li><b>Decoded, not raw.</b> The panel renders the account — client, freelancer, mint, released
+          milestones, vault balance, deadline — instead of an address list.</li>
+        <li><b>Role-aware buttons.</b> A button that would fail is disabled; the program is still the
+          authority, this is only courtesy.</li>
+        <li><b>Honest when it cannot work.</b> If the program is not at the configured address the page says
+          so in a banner, rather than letting six buttons fail one at a time.</li>
+      </ul>
+    </div>
+    <div class="col">
+      <div class="screen">
+<b>3 · The escrow</b><br>
+status        <i>[ Active ]</i><br>
+client        7xKX…9fQ2<br>
+freelancer    B4nR…2pLd<br>
+amount        300.000000<br>
+released      1 of 3 milestones<br>
+in vault      200.000000<br>
+deadline      2026-10-30 21:59:59Z<br>
+──────────────────────────────<br>
+<b>approve milestone</b>   <i>enabled</i><br>
+<b>claim after deadline</b> <i>disabled (deadline not passed)</i><br>
+<b>cancel &amp; refund</b>      <i>disabled (work started)</i>
+      </div>
+      <p class="small" style="margin-top:12px">The escrow panel, as the app renders it.</p>
+    </div>
+  </div>
+
+  <div class="tagline">Milestone Escrow</div>
+  <div class="pno">05 / 10</div>
+</section>
+
+<!-- ============================================================ 6 · COMPLETENESS -->
+<section class="slide">
+  <div class="kicker">What ships</div>
+  <h2>Small enough to audit in one sitting.</h2>
+
+  <div class="row" style="margin-top:26px">
+    <div class="col card">
+      <div class="num">PROGRAM</div>
+      <h3>Anchor 0.30.1</h3>
+      <p class="small">6 instructions, 1 account, 126 bytes, two PDAs. No admin instruction, no upgrade
+      escape hatch, no instruction that moves the vault outside an approval or a passed deadline.</p>
+    </div>
+    <div class="col card">
+      <div class="num">TESTS</div>
+      <h3>18 scenarios</h3>
+      <p class="small">Happy path, both refund paths, every rejection, double-approval, claim before and after
+      the deadline, and the arithmetic that keeps the vault from stranding a remainder.</p>
+    </div>
+    <div class="col card">
+      <div class="num">APP</div>
+      <h3>Single file, no build</h3>
+      <p class="small">Encodes the six instructions itself, so the page never loads a second copy of
+      <span class="mono">@solana/web3.js</span> and never produces a phantom
+      <span class="mono">instanceof PublicKey</span> failure.</p>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:16px">
+    <div class="col card">
+      <div class="num">TOOLING</div>
+      <h3>Three checkers, all exit non-zero</h3>
+      <p class="small"><span class="mono">api-crosscheck</span> for source/IDL/test drift,
+      <span class="mono">app-check</span> for discriminators and account size,
+      <span class="mono">app-keycheck</span> which executes the shipped encoders and compares every account
+      slot and flag to the IDL.</p>
+    </div>
+    <div class="col card">
+      <div class="num">READ THE WHOLE THING</div>
+      <h3>README, including the walls</h3>
+      <p class="small">The build instructions, the Playground failure that reads like a program bug and is
+      not, and an explicit list of what has <i>not</i> been proven. The document that says what is missing
+      is the one worth trusting.</p>
+    </div>
+  </div>
+
+  <div class="tagline">Milestone Escrow</div>
+  <div class="pno">06 / 10</div>
+</section>
+
+<!-- ============================================================ 7 · VERIFICATION -->
+<section class="slide">
+  <div class="kicker">Verification status</div>
+  <h2>What we know, and what we<br>have not proven yet.</h2>
+
+  <table style="margin-top:20px">
+    <thead><tr><th style="width:52%">Claim</th><th style="width:16%">Status</th><th>Basis</th></tr></thead>
+    <tbody>
+      <tr><td class="v" style="color:var(--ink)">The program compiles and produces a real IDL</td>
+        <td><span class="pill ok">PROVEN</span></td>
+        <td class="v">Clean build in Solana Playground; the IDL in the repo is its output.</td></tr>
+      <tr><td class="v" style="color:var(--ink)">The app's six instructions match the program</td>
+        <td><span class="pill ok">PROVEN</span></td>
+        <td class="v">Every discriminator recomputed and every account slot compared to the IDL at runtime.</td></tr>
+      <tr><td class="v" style="color:var(--ink)">The page runs in a browser</td>
+        <td><span class="pill ok">PROVEN</span></td>
+        <td class="v">Loaded, module executed, network check ran, zero console errors.</td></tr>
+      <tr><td class="v" style="color:var(--ink)">The 18 tests pass</td>
+        <td><span class="pill mid">NOT RUN</span></td>
+        <td class="v">The suite starts and sends a real transaction in Playground, then stops on an exhausted
+        devnet faucet. No payer, no test.</td></tr>
+      <tr><td class="v" style="color:var(--ink)">A transaction succeeds on chain</td>
+        <td><span class="pill no">NOT YET</span></td>
+        <td class="v">Nothing is deployed. This is the gap, and it is one <span class="mono">anchor deploy</span>
+        away rather than an unknown.</td></tr>
+    </tbody>
+  </table>
+
+  <p class="small" style="margin-top:auto">Judges see a hundred decks claiming "fully tested, live on devnet".
+  The repo is what they can check, so this deck only claims what the repo supports. The three rows marked
+  proven are reproducible with two commands and no toolchain.</p>
+  <div class="tagline">Milestone Escrow</div>
+  <div class="pno">07 / 10</div>
+</section>
+
+<!-- ============================================================ 8 · WHO -->
+<section class="slide">
+  <div class="kicker">Who it is for</div>
+  <h2>The first job between strangers.</h2>
+
+  <div class="row" style="margin-top:22px">
+    <div class="col">
+      <p class="lede" style="font-size:17px">Not the agency with a procurement department. The person taking a
+      first job from someone in another country, where the only thing either side knows about the other is
+      that they are on the internet.</p>
+      <p class="lede" style="font-size:17px;margin-top:16px">That is the transaction where trust has to be
+      manufactured, and it is the one platforms charge the most for — because they are selling the existence
+      of the money, not the transfer of it.</p>
+    </div>
+    <div class="col card gold">
+      <div class="num">THE ASYMMETRY WE REMOVE</div>
+      <p class="big" style="color:#ffe1a3;font-size:16px">The freelancer starts work against a promise. The
+      client pays against a hope. Both are buying the same thing: proof the other side will not vanish.</p>
+      <p class="small" style="margin-top:14px;color:#d9c79a">A vault anyone can read, with a rule that fires
+      without asking, is that proof — and it does not need either party to be trusted, or even to have a
+      bank account.</p>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:20px">
+    <div class="col card"><h3>Distribution</h3><p class="small">Ships as a link. No install, no account, no
+      KYC — the wallet is the identity, which is also the onboarding cost.</p></div>
+    <div class="col card"><h3>Extensibility</h3><p class="small">A second party (an arbiter) and a dispute
+      branch are additive instructions, not a rewrite. The custody core stays untouched.</p></div>
+    <div class="col card"><h3>Cost</h3><p class="small">Two transaction fees and rent that is refunded on
+      close. The platform's percentage is the thing being deleted.</p></div>
+  </div>
+
+  <div class="tagline">Milestone Escrow</div>
+  <div class="pno">08 / 10</div>
+</section>
+
+<!-- ============================================================ 9 · NEXT -->
+<section class="slide">
+  <div class="kicker">What happens next</div>
+  <h2>From a demo to a thing<br>two strangers use.</h2>
+
+  <div class="row" style="margin-top:24px">
+    <div class="col card"><div class="num">NOW</div><h3>Deploy + first live transaction</h3>
+      <p class="small">One <span class="mono">anchor deploy</span> turns the last "not yet" on slide 7 into a
+      proven row. Everything else is already built.</p></div>
+    <div class="col card"><div class="num">NEXT</div><h3>Two-wallet walkthrough</h3>
+      <p class="small">A recorded flow with a client wallet and a freelancer wallet, including the deadline
+      branch, which no screenshot can demonstrate.</p></div>
+    <div class="col card"><div class="num">THEN</div><h3>Optional arbitration</h3>
+      <p class="small">An arbiter key that can only split — never withdraw — for the disputes that a
+      timestamp cannot settle. Opt-in, so the default stays trustless.</p></div>
+  </div>
+
+  <div class="card green" style="margin-top:24px">
+    <p class="big" style="color:#b9f5da"><b>Business model, stated plainly.</b> A protocol fee below 1% on
+    release, or nothing at all with a paid dashboard for teams — both are plans, not results. The durable
+    position is not the fee; it is being the contract other tools build on, because a wallet is cheaper to
+    acquire than a marketplace is to build.</p>
+  </div>
+
+  <div class="tagline">Milestone Escrow</div>
+  <div class="pno">09 / 10</div>
+</section>
+
+<!-- ============================================================ 10 · CLOSE -->
+<section class="slide cover">
+  <div class="kicker">Try it</div>
+  <h2 style="font-size:46px;max-width:22ch">The money is the agreement.</h2>
+  <p class="lede" style="margin-top:16px">Clone the repo, open <span class="mono">app/index.html</span> on any
+  static server, and press the buttons. Two commands reproduce every proven row on slide 7.</p>
+
+  <div class="card" style="margin-top:30px;max-width:760px">
+    <div class="screen" style="border:0;background:transparent;padding:0">
+<span style="color:var(--dim2)"># 1. check the client against the program</span><br>
+<b>node tools/app-check.js</b><br>
+<b>node tools/app-keycheck.js</b><br><br>
+<span style="color:var(--dim2)"># 2. run the product</span><br>
+<b>python -m http.server 8080</b><br>
+<span style="color:var(--dim2)">→ http://localhost:8080/app/index.html</span>
+    </div>
+  </div>
+
+  <div class="covermeta">
+    <div>Program<b>GPmJtpLs7u7BCfUHjRyaffjPSKuJjEjLY1qztzgtVgpC</b></div>
+    <div>Track<b>HackYeah 2026 · Trustless finance on Solana</b></div>
+    <div>Built<b>October 2026</b></div>
+  </div>
+
+  <div class="tagline">Milestone Escrow · submission deck</div>
+  <div class="pno">10 / 10</div>
+</section>
+
+</body>
+</html>

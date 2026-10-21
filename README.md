@@ -392,6 +392,9 @@ so the deadline path is genuinely exercised. Expect roughly 20 seconds added.
 ```
 Anchor.toml                       program id, toolchain, test script
 app/index.html                    the demo app: single file, no build step, no bundler
+submission/deck.html              10-slide deck, print-ready (Ctrl+P -> PDF, margins none)
+submission/SUBMISSION.md          copy-paste submission text + pre-submit checklist
+submission/VIDEO-SCRIPT.md        3-minute shot list, timed, with the two-wallet setup
 programs/escrow/Cargo.toml        anchor-lang 0.30.1, anchor-spl 0.30.1
 programs/escrow/src/lib.rs        the program
 tests/escrow.ts                   18 tests
