@@ -97,7 +97,7 @@ a terms-of-service document, and all of it is 126 bytes a reader can inspect.
 | Repo | `TO DO — public GitHub/GitLab URL` |
 | Live demo | `TO DO — deployed app URL (or "run locally: see README")` |
 | Video | `TO DO — ≤3 min, script in VIDEO-SCRIPT.md` |
-| Deck | `submission/deck.html` → print to PDF (Ctrl+P, margins None, background ON) |
+| Deck | `submission/deck.pdf` — 10 pages, already rendered (source: `deck.html`) |
 | Program (devnet) | `TO DO` once `anchor deploy` has run |
 
 ---
@@ -110,5 +110,7 @@ a terms-of-service document, and all of it is 126 bytes a reader can inspect.
 - [ ] Push the repo publicly. `.gitignore` already excludes `target/` and `node_modules/`; check that no
       keypair is staged — **`git ls-files | Select-String "json"`** should only show `idl/escrow.json`.
 - [ ] Record the video from `VIDEO-SCRIPT.md`.
-- [ ] Print the deck to PDF and check it is 10 pages, not 11 with a blank last page.
+- [x] **Deck PDF rendered:** `submission/deck.pdf`, 10 pages at 960×540 pt (16:9), verified by counting the
+      page objects. Re-render after any edit with:
+      `chrome --headless=new --no-pdf-header-footer --print-to-pdf=submission/deck.pdf submission/deck.html`
 - [ ] Open the deployed app in a clean browser profile and run the flow once, end to end, before recording.
