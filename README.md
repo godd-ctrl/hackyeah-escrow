@@ -177,6 +177,93 @@ tested so it cannot regress silently.
 
 ---
 
+## The demo app
+
+`app/index.html` is the product rather than a mockup: connect a wallet, post a job, accept it, release
+a milestone, claim after a deadline, and read the escrow's state straight off the chain. It is a single
+file with no build step and no bundler, so a reviewer can open it and see the flow without running
+`npm install` and without trusting a build artefact that might not match the source.
+
+```bash
+python -m http.server 8080
+# http://localhost:8080/app/index.html
+```
+
+It needs a browser wallet (Phantom, Backpack or Solflare) on **devnet**, and the program deployed —
+see below. If the program is not at the configured address the page says so in a banner instead of
+letting every transaction fail one at a time.
+
+### What the flow does
+
+1. **Create demo money.** Mints a 6-decimal token and funds your own token account, so the whole flow
+   can be exercised without a faucet and without asking anyone for devnet USDC.
+2. **Post a job.** The escrow account is a PDA of `["escrow", client, mint, deadline]` and the vault is
+   funded in the same transaction. The amount must divide evenly by the milestone count — the program
+   rejects a remainder on purpose, and the app says why before sending rather than after.
+3. **Accept as freelancer.** Creates the freelancer's token account in the same transaction if it does
+   not exist. They pay its rent, because the account is theirs, and the client never has to.
+4. **Approve a milestone.** Releases `amount / milestones` from the vault to the freelancer.
+5. **Claim after the deadline.** If the client stops reviewing, the freelancer takes the remainder.
+   This is the instruction that replaces the platform's dispute desk.
+6. **Cancel before acceptance, close after completion.** Both return the rent to the client.
+
+Every action prints the transaction signature and links to the explorer, and the escrow panel renders
+a decoded account rather than a raw address list.
+
+### What the app checks prove, and what they do not
+
+The client encodes the six instructions itself. That is a deliberate trade — `@coral-xyz/anchor`'s
+browser build expects a bundler, and pulling a second copy of `@solana/web3.js` alongside it is how you
+get `instanceof PublicKey` failures that read like RPC errors — but hand-encoding unverified would be
+worse than no app, so two checkers run against it and both exit non-zero on drift:
+
+```bash
+node tools/app-check.js      # static: hashes, layout, browser safety, parse
+node tools/app-keycheck.js   # behavioural: runs the app's own encoders
+```
+
+`app-check.js` recomputes every discriminator from the IDL and compares it with the app's table, after
+first validating the hashing rule itself against Anchor's published constant for `initialize`
+(`afaf6d1f0d989bed`). It also checks the decoder's length guard against the size implied by the IDL,
+and refuses to let Node's `Buffer` back into the file — that was a real bug in the first draft, where
+`Buffer.from("escrow")` in the PDA derivation would have thrown on the first click in a browser.
+
+`app-keycheck.js` is the one that matters, because it executes the shipped code. It takes the real
+`<script>` block out of the app, swaps only its CDN loader for the real `@solana/web3.js` (installed in
+an isolated workspace outside this repo), and calls the encoders. Every account slot and every
+signer/writable flag is compared to `idl/escrow.json`, position by position — a swapped key produces a
+perfectly well-formed transaction that the program rejects with an unreadable constraint error, and no
+hash check can see that. It round-trips `createEscrow`'s 25 data bytes, derives the ATA independently,
+and decodes a synthetic 126-byte account including the case that actually bites: `None(freelancer)`
+still occupies `1 + 32` bytes, so a decoder that treated it as one byte would misread every field
+after it.
+
+**Not proven:** that a transaction succeeds on chain. Nothing is deployed and this machine has no
+Solana toolchain, so the client is verified against the IDL the program was compiled with, not against
+a live program. The first real transaction will be the first real test of that boundary, and this
+paragraph exists so that nobody reads "all checks passed" as more than it is.
+
+Setup for the behavioural checker, once:
+
+```bash
+npm install --prefix "%TEMP%\opencode\escrow-check" @solana/web3.js@1.95.8
+```
+
+### Deploying
+
+```bash
+anchor build
+anchor deploy --provider.cluster devnet
+```
+
+Or paste `programs/escrow/src/lib.rs` into [Solana Playground](https://beta.solpg.io) and press
+Deploy, which needs no local toolchain. Keep the program keypair: `declare_id!` pins
+`GPmJtpLs7u7BCfUHjRyaffjPSKuJjEjLY1qztzgtVgpC`, so deploying with a different keypair means rebuilding
+with the new id — or, without rebuilding, pasting the new address into the app's **Program ID** field,
+which is why that field exists.
+
+---
+
 ## Build and test
 
 ### In the browser (no toolchain required)
@@ -304,12 +391,15 @@ so the deadline path is genuinely exercised. Expect roughly 20 seconds added.
 
 ```
 Anchor.toml                       program id, toolchain, test script
+app/index.html                    the demo app: single file, no build step, no bundler
 programs/escrow/Cargo.toml        anchor-lang 0.30.1, anchor-spl 0.30.1
 programs/escrow/src/lib.rs        the program
 tests/escrow.ts                   18 tests
 idl/escrow.json                   IDL from the verified clean build (Solana Playground, 2026-10-19)
 tools/api-crosscheck.js           structural + API drift checker (no toolchain needed)
 tools/make-target-types.js        rebuilds target/ from idl/ so a fresh clone can run the tests
+tools/app-check.js                app <-> IDL: discriminators, account size, browser safety, parse
+tools/app-keycheck.js             app <-> IDL: runs the shipped encoders against real web3.js
 ```
 
 Run the cross-checker on any change:

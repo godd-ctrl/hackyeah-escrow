@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Milestone Escrow — trustless freelance payments on Solana</title>
+<!--
+  WHY THIS FILE HAS NO BUILD STEP.
+
+  A judge, a client, or another developer should be able to open this page and see the product
+  without running npm install, and without trusting a build artefact that might not match the source.
+  Everything the demo needs is in this one file except @solana/web3.js, which is loaded from a CDN at
+  runtime and used only to build and sign transactions.
+
+  WHY THE ANCHOR CLIENT IS HAND-ROLLED INSTEAD OF IMPORTED.
+
+  @coral-xyz/anchor's browser build expects a bundler. Pulling a second copy of @solana/web3.js from a
+  CDN alongside it is how you get "instanceof PublicKey" failures that look like RPC errors, so the
+  six instructions this program exposes are encoded directly, and the encoding is the only thing
+  that could be wrong.
+
+  The instruction discriminators below are the first 8 bytes of sha256("global:<snake_case_name>"),
+  which is Anchor's published rule. That rule was checked against Anchor's own known constant before
+  anything was written: sha256("global:initialize")[0..8] == afaf6d1f0d989bed. If the derivation were
+  wrong, that check would have failed rather than quietly producing instructions the program rejects.
+-->
+<style>
+  :root{
+    --bg:#0a0d14; --panel:#111725; --panel2:#0d1320; --line:#1e2a40; --line2:#2a3a58;
+    --ink:#e8eefc; --dim:#8fa0be; --dim2:#64748b;
+    --gold:#ffcc66; --green:#3ddc97; --red:#ff6b6b; --blue:#5aa9ff; --violet:#a78bfa;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans)}
+  body{min-height:100vh;background:
+    radial-gradient(900px 500px at 15% -10%,rgba(90,169,255,.10),transparent 60%),
+    radial-gradient(800px 500px at 90% 0%,rgba(167,139,250,.09),transparent 55%),var(--bg)}
+  a{color:var(--blue)}
+  header{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--line);
+    background:rgba(10,13,20,.86);backdrop-filter:blur(10px);position:sticky;top:0;z-index:10}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:650;letter-spacing:-.01em}
+  .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(145deg,var(--gold),#f59e0b);
+    display:grid;place-items:center;color:#20160a;font-weight:900;font-size:15px}
+  .brand small{display:block;font-weight:450;font-size:11.5px;color:var(--dim2);letter-spacing:.01em}
+  .spacer{flex:1}
+  .pill{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--dim);
+    border:1px solid var(--line);border-radius:999px;padding:6px 11px;background:var(--panel2)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 9px currentColor}
+  .dot.on{background:var(--green);box-shadow:0 0 9px var(--green)}
+  button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line2);
+    background:var(--panel2);color:var(--ink);padding:10px 15px;font-size:13.5px;font-weight:600;
+    transition:transform .12s ease,background .15s,border-color .15s,opacity .15s}
+  button:hover:not(:disabled){background:#16203a;border-color:#3a4d72}
+  button:active:not(:disabled){transform:translateY(1px)}
+  button:disabled{opacity:.42;cursor:not-allowed}
+  button.primary{background:linear-gradient(145deg,#ffd479,#f0a92e);border-color:#c98a1d;color:#241703}
+  button.primary:hover:not(:disabled){background:linear-gradient(145deg,#ffdd94,#f5b53c)}
+  button.ok{background:linear-gradient(145deg,#43e6a4,#22b57a);border-color:#17925f;color:#04160f}
+  button.bad{border-color:#5a2630;background:#20101a;color:#ffb4b4}
+  button.ghost{background:transparent}
+  .wrap{max-width:1180px;margin:0 auto;padding:26px 22px 70px}
+  h1{font-size:clamp(22px,3vw,31px);line-height:1.16;margin:0 0 8px;letter-spacing:-.022em}
+  .lede{color:var(--dim);font-size:14.5px;line-height:1.62;max-width:76ch;margin:0}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+    border-radius:16px;padding:18px}
+  .card h2{margin:0 0 4px;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)}
+  .card .sub{margin:0 0 15px;font-size:12.5px;color:var(--dim2);line-height:1.5}
+  label{display:block;font-size:11.5px;color:var(--dim);margin:12px 0 6px;letter-spacing:.02em}
+  input{width:100%;background:#0a1020;border:1px solid var(--line2);color:var(--ink);
+    border-radius:10px;padding:11px 12px;font-size:13.5px;font-family:var(--mono)}
+  input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(90,169,255,.14)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .row > *{flex:1 1 auto}
+  .row .fixed{flex:0 0 auto}
+  .kv{display:grid;grid-template-columns:132px 1fr;gap:7px 12px;font-size:13px;margin-top:12px}
+  .kv dt{color:var(--dim2);font-size:12px}
+  .kv dd{margin:0;font-family:var(--mono);font-size:12.5px;word-break:break-all}
+  .tag{display:inline-block;font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid var(--line2);
+    font-family:var(--sans);font-weight:650;letter-spacing:.03em}
+  .tag.open{color:var(--blue);border-color:#1e3d63;background:#0b1a2b}
+  .tag.active{color:var(--gold);border-color:#4a3a17;background:#1d1708}
+  .tag.completed{color:var(--green);border-color:#17452f;background:#08201a}
+  .tag.cancelled{color:var(--dim2);border-color:#2b3242;background:#141821}
+  .bar{height:8px;border-radius:99px;background:#0a1020;border:1px solid var(--line);overflow:hidden;margin-top:14px}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,#3ddc97,#7ee7c0);width:0;transition:width .4s ease}
+  .log{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+  .log div{font-family:var(--mono);font-size:11.5px;color:var(--dim);padding:3px 0;word-break:break-all}
+  .log div.err{color:#ff9b9b}
+  .log div.ok{color:#7ee7c0}
+  .warn{border:1px solid #4a3a17;background:#1c1607;color:#ffd48a;border-radius:12px;padding:12px 14px;
+    font-size:13px;line-height:1.55;margin-top:18px}
+  .warn code{background:#00000055;padding:2px 6px;border-radius:6px;font-size:12px}
+  .rationale{margin-top:26px;border-top:1px solid var(--line);padding-top:22px;
+    display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:900px){.rationale{grid-template-columns:1fr}}
+  .rationale h3{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);margin:0 0 7px}
+  .rationale p{margin:0;font-size:13px;line-height:1.62;color:#b9c6dd}
+  .foot{margin-top:26px;color:var(--dim2);font-size:12px;text-align:center}
+  .addr{font-family:var(--mono);font-size:11.5px;color:var(--dim);word-break:break-all}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">E</div>
+    <div>Milestone Escrow<small>freelance payments without a platform</small></div>
+  </div>
+  <div class="spacer"></div>
+  <span class="pill" id="netPill"><span class="dot" id="netDot"></span><span id="netTxt">devnet</span></span>
+  <button id="walletBtn" class="primary">Connect wallet</button>
+</header>
+
+<div class="wrap">
+  <h1>Get paid for work, without trusting a platform to hold the money.</h1>
+  <p class="lede">
+    A client locks the job's full amount in an on-chain vault. The freelancer sees the money exists before
+    starting. The client releases it milestone by milestone. If the client goes silent, the freelancer can
+    claim everything after the deadline. No platform holds the funds, and no party can change the terms
+    unilaterally &mdash; the rules live in the program.
+  </p>
+
+  <div class="warn" id="deployWarn" hidden>
+    <strong>Program not found on devnet.</strong> The client below is complete, but this cluster has no
+    account at the program address, so every transaction will fail until it is deployed. Deploy with
+    <code>anchor deploy --provider.cluster devnet</code> (or Solana Playground) using the keypair that
+    matches <code>declare_id!</code>, then reload. Nothing on this page pretends otherwise.
+  </div>
+
+  <div class="grid">
+    <!-- ---------------------------------------------------------------- setup -->
+    <section class="card">
+      <h2>1 &middot; Setup</h2>
+      <p class="sub">Everything here is devnet. The demo token exists so the flow can be exercised without a faucet.</p>
+
+      <label for="programId">Program ID</label>
+      <input id="programId" spellcheck="false">
+
+      <label for="mint">Token mint (the thing being escrowed)</label>
+      <input id="mint" placeholder="create demo money below, or paste a devnet mint" spellcheck="false">
+
+      <div class="row" style="margin-top:14px">
+        <button id="demoTokenBtn" class="fixed">Create demo money</button>
+        <button id="copyMintBtn" class="ghost fixed">Copy mint</button>
+      </div>
+
+      <div class="log" id="setupLog"></div>
+    </section>
+
+    <!-- --------------------------------------------------------------- client -->
+    <section class="card">
+      <h2>2 &middot; Client posts a job</h2>
+      <p class="sub">The amount is taken from your token account and held by the program's vault PDA.</p>
+
+      <label for="amount">Total amount (whole tokens)</label>
+      <input id="amount" value="300" inputmode="decimal">
+
+      <div class="row" style="margin-top:12px">
+        <div>
+          <label for="milestones">Milestones</label>
+          <input id="milestones" value="3" inputmode="numeric">
+        </div>
+        <div>
+          <label for="deadlineMin">Deadline in (minutes)</label>
+          <input id="deadlineMin" value="10" inputmode="numeric">
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:14px">
+        <button id="createBtn" class="primary">Create escrow</button>
+      </div>
+      <div class="log" id="clientLog"></div>
+    </section>
+  </div>
+
+  <!-- --------------------------------------------------------------- escrow --->
+  <section class="card" style="margin-top:16px">
+    <h2>3 &middot; The escrow</h2>
+    <p class="sub">Share this address with the freelancer. Anyone can read it; only the two parties can act on it.</p>
+
+    <label for="escrowAddr">Escrow address</label>
+    <input id="escrowAddr" placeholder="created above, or paste one" spellcheck="false">
+
+    <div class="row" style="margin-top:12px">
+      <button id="loadBtn" class="fixed">Load</button>
+      <button id="acceptBtn" class="ok fixed">Accept as freelancer</button>
+      <button id="approveBtn" class="primary fixed">Approve milestone</button>
+      <button id="claimBtn" class="fixed">Claim after deadline</button>
+      <button id="cancelBtn" class="bad fixed">Cancel &amp; refund</button>
+      <button id="closeBtn" class="ghost fixed">Close account</button>
+    </div>
+
+    <div id="escrowBody" style="margin-top:6px">
+      <p class="sub" style="margin-top:14px">No escrow loaded.</p>
+    </div>
+    <div class="log" id="escrowLog"></div>
+  </section>
+
+  <!-- ------------------------------------------------------------ rationale --->
+  <div class="rationale">
+    <div>
+      <h3>Who this is for</h3>
+      <p>
+        A freelancer taking a first job from a stranger overseas, and a small client who does not want to
+        wire money to someone they met yesterday. Today they use an Upwork-style platform, which holds the
+        funds, takes a cut, and can freeze either side's account without explanation.
+      </p>
+    </div>
+    <div>
+      <h3>What the intermediary was doing</h3>
+      <p>
+        Holding money in the middle, deciding who was right in a dispute, and enforcing the schedule. The
+        first two are replaced by a vault only the program can move plus deterministic rules; the third by
+        a deadline that lets the freelancer claim the remaining balance if the client never reviews.
+      </p>
+    </div>
+    <div>
+      <h3>What changes without it</h3>
+      <p>
+        The client cannot unilaterally take the money back after work has started. The freelancer cannot
+        take it before delivery. Neither needs an account, a reputation score, or a permission to be paid.
+        The platform's fee and its discretion both disappear, and the transaction is the agreement.
+      </p>
+    </div>
+  </div>
+
+  <p class="foot">devnet demo &middot; no real funds &middot; all state is on-chain and every action links to the explorer</p>
+</div>
+
+<script type="module">
+/* =================================================================================================
+   LOADING @solana/web3.js
+   Two CDNs, tried in order. The second exists because a single CDN being unreachable should not make
+   the product look broken - but if both fail the page says so rather than silently doing nothing.
+   ================================================================================================= */
+async function loadWeb3() {
+  const urls = [
+    "https://cdn.jsdelivr.net/npm/@solana/web3.js@1.95.8/+esm",
+    "https://esm.sh/@solana/web3.js@1.95.8",
+  ];
+  const failures = [];
+  for (const u of urls) {
+    try {
+      return await import(/* @vite-ignore */ u);
+    } catch (e) {
+      failures.push(u.split("/")[2] + ": " + e.message);
+    }
+  }
+  throw new Error("could not load @solana/web3.js - " + failures.join(" | "));
+}
+
+const web3 = await loadWeb3();
+const {
+  Connection, PublicKey, Keypair, Transaction, TransactionInstruction,
+  SystemProgram, SYSVAR_RENT_PUBKEY,
+} = web3;
+
+/* =================================================================================================
+   CONSTANTS
+   ================================================================================================= */
+const CLUSTER = "devnet";
+const RPC = "https://api.devnet.solana.com";
+const EXPLORER = (x) => `https://explorer.solana.com/${x}?cluster=${CLUSTER}`;
+
+// Program ids are fixed by the chain, not by this app.
+const DEFAULT_PROGRAM_ID = "GPmJtpLs7u7BCfUHjRyaffjPSKuJjEjLY1qztzgtVgpC";
+const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+const ATA_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+
+// Anchor discriminators: first 8 bytes of sha256("global:<name>") and sha256("account:<Name>").
+// Derivation verified against Anchor's published constant for "global:initialize" (afaf6d1f0d989bed)
+// before these were used, because a wrong discriminator produces a transaction the program rejects
+// with an unhelpful error rather than an obviously wrong one.
+const IX = {
+  createEscrow:      "fdd7a574246c4450",
+  acceptEscrow:      "c102e0f52474419a",
+  approveMilestone:  "91555c3c3282db6a",
+  cancelEscrow:      "9ccb36b326482115",
+  claimUnreviewed:   "8a20068f9aacf496",
+  closeEscrow:       "8bab5e92bf5b9032",
+};
+const ACCOUNT_DISC_ESCROW = "1fd57bbbba16da9b";
+
+const STATUS = ["Open", "Active", "Completed", "Cancelled"];
+
+/* =================================================================================================
+   SMALL HELPERS
+   Amounts are handled as BigInt in base units everywhere. Doing money in floats is how a demo ends up
+   showing 299.99999998.
+   ================================================================================================= */
+const $ = (id) => document.getElementById(id);
+const conn = new Connection(RPC, "confirmed");
+
+const hexBytes = (h) => new Uint8Array(h.match(/.{2}/g).map((b) => parseInt(b, 16)));
+const u64le = (n) => {
+  const b = new Uint8Array(8);
+  new DataView(b.buffer).setBigUint64(0, BigInt(n), true);
+  return b;
+};
+const i64le = (n) => {
+  const b = new Uint8Array(8);
+  new DataView(b.buffer).setBigInt64(0, BigInt(n), true);
+  return b;
+};
+const concat = (...parts) => {
+  const len = parts.reduce((s, p) => s + p.length, 0);
+  const out = new Uint8Array(len);
+  let o = 0;
+  for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+};
+const short = (s, n = 4) => (s ? s.slice(0, n) + "…" + s.slice(-n) : "");
+
+function log(el, msg, kind) {
+  const d = document.createElement("div");
+  if (kind) d.className = kind;
+  d.textContent = msg;
+  el.prepend(d);
+  while (el.childElementCount > 14) el.lastElementChild.remove();
+}
+
+function setNet(on, text) {
+  $("netDot").className = "dot" + (on ? " on" : "");
+  $("netTxt").textContent = text || (on ? "devnet" : "not connected");
+}
+
+/* =================================================================================================
+   WALLET
+   Injected providers only. No wallet-adapter dependency, because the demo needs exactly two calls
+   (connect, sign) and a dependency tree is a worse trade than forty lines here.
+   ================================================================================================= */
+let provider = null;
+let me = null;
+
+function detectWallet() {
+  if (window.phantom?.solana?.isPhantom) return window.phantom.solana;
+  if (window.backpack) return window.backpack;
+  if (window.solflare?.isSolflare) return window.solflare;
+  if (window.solana?.isPhantom) return window.solana;
+  return null;
+}
+
+async function connectWallet() {
+  provider = detectWallet();
+  if (!provider) {
+    log($("setupLog"), "No injected wallet found. Install Phantom, Backpack or Solflare, then reload.", "err");
+    return;
+  }
+  const res = await provider.connect();
+  const pk = res?.publicKey ?? provider.publicKey;
+  me = new PublicKey(pk.toString());
+  setNet(true, "devnet · " + short(me.toBase58()));
+  $("walletBtn").textContent = short(me.toBase58());
+  log($("setupLog"), "connected " + me.toBase58(), "ok");
+}
+
+/**
+ * Sign and send. Extra Keypair signers are partial-signed first, then the wallet adds its own
+ * signature - the order matters because a wallet will refuse a transaction that pays a fee it cannot
+ * see signed, and because a freshly created mint has to sign its own account creation.
+ */
+async function send(ixs, extraSigners = []) {
+  if (!me || !provider) throw new Error("connect a wallet first");
+  const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash("confirmed");
+  const tx = new Transaction({ feePayer: me, blockhash, lastValidBlockHeight });
+  for (const ix of ixs) tx.add(ix);
+  if (extraSigners.length) tx.partialSign(...extraSigners);
+  const signed = await provider.signTransaction(tx);
+  const sig = await conn.sendRawTransaction(signed.serialize(), { skipPreflight: false });
+  await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+  return sig;
+}
+
+/* =================================================================================================
+   PROGRAM ENCODING
+   Mirrors accounts/escrow/src/lib.rs exactly. The order of keys is part of the interface: Anchor
+   matches them positionally, so a reordered key list is a different instruction, not a different
+   spelling of the same one.
+   ================================================================================================= */
+const programId = () => new PublicKey($("programId").value.trim() || DEFAULT_PROGRAM_ID);
+
+const ataFor = (owner, mint) =>
+  PublicKey.findProgramAddressSync(
+    [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+    ATA_PROGRAM_ID
+  )[0];
+
+const ESCROW_SEED = new TextEncoder().encode("escrow");
+const VAULT_SEED = new TextEncoder().encode("vault");
+
+const escrowPda = (client, mint, deadline) =>
+  PublicKey.findProgramAddressSync(
+    // Seeds are byte arrays, not strings: the program compares raw bytes, and TextEncoder is used
+    // rather than Buffer because this code runs in a browser where Buffer does not exist.
+    [ESCROW_SEED, client.toBuffer(), mint.toBuffer(), i64le(deadline)],
+    programId()
+  )[0];
+
+const vaultPda = (escrow) =>
+  PublicKey.findProgramAddressSync([VAULT_SEED, escrow.toBuffer()], programId())[0];
+
+const K = (pubkey, isSigner = false, isWritable = false) => ({ pubkey, isSigner, isWritable });
+
+function createEscrowIx(client, mint, clientAta, amount, milestones, deadline) {
+  const pid = programId();
+  const escrow = escrowPda(client, mint, deadline);
+  const vault = vaultPda(escrow);
+  return {
+    escrow,
+    ix: new TransactionInstruction({
+      programId: pid,
+      keys: [
+        K(client, true, true),
+        K(escrow, false, true),
+        K(mint),
+        K(clientAta, false, true),
+        K(vault, false, true),
+        K(TOKEN_PROGRAM_ID),
+        K(SystemProgram.programId),
+        K(SYSVAR_RENT_PUBKEY),
+      ],
+      data: concat(hexBytes(IX.createEscrow), u64le(amount), Uint8Array.of(milestones), i64le(deadline)),
+    }),
+  };
+}
+
+const acceptEscrowIx = (freelancer, escrow) =>
+  new TransactionInstruction({
+    programId: programId(),
+    keys: [K(freelancer, true, true), K(escrow, false, true)],
+    data: hexBytes(IX.acceptEscrow),
+  });
+
+const approveMilestoneIx = (client, escrow, freelancer, mint, vault, freelancerAta) =>
+  new TransactionInstruction({
+    programId: programId(),
+    keys: [
+      K(client, true, true),
+      K(escrow, false, true),
+      K(freelancer),
+      K(mint),
+      K(vault, false, true),
+      K(freelancerAta, false, true),
+      K(TOKEN_PROGRAM_ID),
+    ],
+    data: hexBytes(IX.approveMilestone),
+  });
+
+const cancelEscrowIx = (client, escrow, mint, vault, clientAta) =>
+  new TransactionInstruction({
+    programId: programId(),
+    keys: [K(client, true, true), K(escrow, false, true), K(mint), K(vault, false, true), K(clientAta, false, true), K(TOKEN_PROGRAM_ID)],
+    data: hexBytes(IX.cancelEscrow),
+  });
+
+const claimUnreviewedIx = (freelancer, escrow, mint, vault, freelancerAta) =>
+  new TransactionInstruction({
+    programId: programId(),
+    keys: [K(freelancer, true, true), K(escrow, false, true), K(mint), K(vault, false, true), K(freelancerAta, false, true), K(TOKEN_PROGRAM_ID)],
+    data: hexBytes(IX.claimUnreviewed),
+  });
+
+const closeEscrowIx = (client, escrow, vault) =>
+  new TransactionInstruction({
+    programId: programId(),
+    keys: [K(client, true, true), K(escrow, false, true), K(vault, false, true), K(TOKEN_PROGRAM_ID)],
+    data: hexBytes(IX.closeEscrow),
+  });
+
+/* ---- the three SPL instructions the demo needs (no spl-token dependency) ---------------------- */
+function createAtaIx(payer, owner, mint) {
+  return new TransactionInstruction({
+    programId: ATA_PROGRAM_ID,
+    keys: [
+      K(payer, true, true),
+      K(ataFor(owner, mint), false, true),
+      K(owner),
+      K(mint),
+      K(SystemProgram.programId),
+      K(TOKEN_PROGRAM_ID),
+    ],
+    data: new Uint8Array(0),
+  });
+}
+
+// InitializeMint2 is instruction 20; it exists precisely so a mint can be created in one transaction
+// without a separate initialise step, which keeps the demo to a single approval.
+const initMint2Ix = (mint, decimals, authority, freezeAuthority) =>
+  new TransactionInstruction({
+    programId: TOKEN_PROGRAM_ID,
+    keys: [K(mint, false, true)],
+    data: concat(Uint8Array.of(20, decimals), authority.toBuffer(), freezeAuthority ? concat(Uint8Array.of(1), freezeAuthority.toBuffer()) : Uint8Array.of(0)),
+  });
+
+const mintToIx = (mint, dest, authority, amount) =>
+  new TransactionInstruction({
+    programId: TOKEN_PROGRAM_ID,
+    keys: [K(mint, false, true), K(dest, false, true), K(authority, true)],
+    data: concat(Uint8Array.of(7), u64le(amount)),
+  });
+
+/* =================================================================================================
+   DECODING THE ESCROW ACCOUNT
+   Layout is fixed and known: 8-byte discriminator, then the fields in declaration order. Anchor's
+   Option<Pubkey> always reserves 1 + 32 bytes in an allocated account, so a None still consumes 32
+   zero bytes and the offsets after it do not move.
+   ================================================================================================= */
+const toHex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+
+function decodeEscrow(buf) {
+  if (!buf || buf.length < 126) return null;
+  // Buffer does not exist in a browser, so the discriminator comparison is done on hex text.
+  if (toHex(buf.subarray(0, 8)) !== ACCOUNT_DISC_ESCROW) return null;
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  let o = 8;
+  const client = new PublicKey(buf.slice(o, o + 32)); o += 32;
+  const hasFreelancer = buf[o] === 1; o += 1;
+  const freelancer = hasFreelancer ? new PublicKey(buf.slice(o, o + 32)) : null; o += 32;
+  const mint = new PublicKey(buf.slice(o, o + 32)); o += 32;
+  const amount = dv.getBigUint64(o, true); o += 8;
+  const milestones = buf[o]; o += 1;
+  const approved = buf[o]; o += 1;
+  const deadline = dv.getBigInt64(o, true); o += 8;
+  const status = buf[o]; o += 1;
+  const bump = buf[o]; o += 1;
+  const vaultBump = buf[o]; o += 1;
+  return { client, freelancer, mint, amount, milestones, approved, deadline, status, bump, vaultBump };
+}
+
+const fmtAmount = (base) => {
+  const s = base.toString().padStart(7, "0");
+  return s.slice(0, -6) + "." + s.slice(-6);
+};
+const parseAmount = (text) => {
+  const clean = String(text).trim();
+  if (!/^\d+(\.\d{0,6})?$/.test(clean)) throw new Error("amount must be a number with at most 6 decimals");
+  const [w, f = ""] = clean.split(".");
+  return BigInt(w) * 1000000n + BigInt((f + "000000").slice(0, 6));
+};
+
+/* =================================================================================================
+   STATE
+   ================================================================================================= */
+let current = null; // {address, data}
+
+const PROGRAM_ID_KEY = "escrow.programId";
+const MINT_KEY = "escrow.mint";
+
+function boot() {
+  $("programId").value = localStorage.getItem(PROGRAM_ID_KEY) || DEFAULT_PROGRAM_ID;
+  $("mint").value = localStorage.getItem(MINT_KEY) || "";
+  $("programId").addEventListener("change", () => {
+    localStorage.setItem(PROGRAM_ID_KEY, $("programId").value.trim());
+    refreshDeployState();
+  });
+  $("mint").addEventListener("change", () => localStorage.setItem(MINT_KEY, $("mint").value.trim()));
+  refreshDeployState();
+}
+
+/**
+ * A demo that can silently fail every transaction is worse than one that says "not deployed".
+ * This reads the program account once and states plainly which world the user is in.
+ */
+async function refreshDeployState() {
+  try {
+    const acc = await conn.getAccountInfo(programId());
+    const ok = !!acc && acc.executable;
+    $("deployWarn").hidden = ok;
+    setNet(!!me, (ok ? "devnet" : "devnet · program not deployed") + (me ? " · " + short(me.toBase58()) : ""));
+  } catch (e) {
+    $("deployWarn").hidden = false;
+  }
+}
+
+/* =================================================================================================
+   ACTIONS
+   ================================================================================================= */
+async function createDemoMoney() {
+  try {
+    if (!me) throw new Error("connect a wallet first");
+    const mintKp = Keypair.generate();
+    const lamports = await conn.getMinimumBalanceForRentExemption(82);
+    const myAta = ataFor(me, mintKp.publicKey);
+    const sig = await send(
+      [
+        SystemProgram.createAccount({
+          fromPubkey: me,
+          newAccountPubkey: mintKp.publicKey,
+          lamports,
+          space: 82,
+          programId: TOKEN_PROGRAM_ID,
+        }),
+        initMint2Ix(mintKp.publicKey, 6, me, null),
+        createAtaIx(me, me, mintKp.publicKey),
+        mintToIx(mintKp.publicKey, myAta, me, 1000000n * 1000000n),
+      ],
+      [mintKp]
+    );
+    $("mint").value = mintKp.publicKey.toBase58();
+    localStorage.setItem(MINT_KEY, $("mint").value);
+    log($("setupLog"), "demo money created (1,000,000 units) - mint " + $("mint").value, "ok");
+    log($("setupLog"), "tx " + sig, "ok");
+  } catch (e) {
+    log($("setupLog"), "create demo money: " + (e.message || e), "err");
+  }
+}
+
+async function createEscrow() {
+  try {
+    if (!me) throw new Error("connect a wallet first");
+    const mintStr = $("mint").value.trim();
+    if (!mintStr) throw new Error("set a token mint first");
+    const mint = new PublicKey(mintStr);
+    const amount = parseAmount($("amount").value);
+    const milestones = Number($("milestones").value);
+    if (!Number.isInteger(milestones) || milestones < 1 || milestones > 10) throw new Error("milestones must be 1-10");
+    const minutes = Number($("deadlineMin").value);
+    if (!Number.isFinite(minutes) || minutes <= 0) throw new Error("deadline must be in the future");
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + Math.round(minutes * 60));
+
+    // The program rejects a non-divisible amount on purpose: a remainder would be stranded in the
+    // vault with no instruction able to move it. Say so here rather than let the chain say it in hex.
+    if (amount % BigInt(milestones) !== 0n) throw new Error("amount must divide evenly by the milestone count");
+
+    const { escrow, ix } = createEscrowIx(me, mint, ataFor(me, mint), amount, milestones, deadline);
+    const sig = await send([ix]);
+    $("escrowAddr").value = escrow.toBase58();
+    log($("clientLog"), "escrow created at " + escrow.toBase58(), "ok");
+    log($("clientLog"), "tx " + sig, "ok");
+    await loadEscrow();
+  } catch (e) {
+    log($("clientLog"), "create: " + (e.message || e), "err");
+  }
+}
+
+async function loadEscrow() {
+  const addr = $("escrowAddr").value.trim();
+  if (!addr) return;
+  try {
+    const pk = new PublicKey(addr);
+    const info = await conn.getAccountInfo(pk);
+    if (!info) {
+      current = null;
+      $("escrowBody").innerHTML = `<p class="sub" style="margin-top:14px">No account at ${addr} on ${CLUSTER}.</p>`;
+      return;
+    }
+    const data = decodeEscrow(info.data);
+    if (!data) {
+      current = null;
+      $("escrowBody").innerHTML = `<p class="sub" style="margin-top:14px">That account is not an Escrow (discriminator mismatch).</p>`;
+      return;
+    }
+    current = { address: pk, data };
+    await paintEscrow();
+  } catch (e) {
+    log($("escrowLog"), "load: " + (e.message || e), "err");
+  }
+}
+
+async function paintEscrow() {
+  if (!current) return;
+  const { address, data } = current;
+  const vault = vaultPda(address);
+  let vaultUi = "?";
+  try {
+    const bal = await conn.getTokenAccountBalance(vault);
+    vaultUi = bal.value.uiAmountString;
+  } catch {
+    vaultUi = "0";
+  }
+  const done = data.approved;
+  const pct = data.milestones ? Math.round((done / data.milestones) * 100) : 0;
+  const cls = ["open", "active", "completed", "cancelled"][data.status] || "open";
+  const deadlineMs = Number(data.deadline) * 1000;
+  const expired = Date.now() > deadlineMs;
+
+  $("escrowBody").innerHTML = `
+    <dl class="kv">
+      <dt>status</dt><dd><span class="tag ${cls}">${STATUS[data.status] || data.status}</span></dd>
+      <dt>address</dt><dd><a href="${EXPLORER("address/" + address.toBase58())}" target="_blank" rel="noreferrer">${address.toBase58()}</a></dd>
+      <dt>client</dt><dd>${data.client.toBase58()}</dd>
+      <dt>freelancer</dt><dd>${data.freelancer ? data.freelancer.toBase58() : "not accepted yet"}</dd>
+      <dt>mint</dt><dd>${data.mint.toBase58()}</dd>
+      <dt>amount</dt><dd>${fmtAmount(data.amount)} tokens</dd>
+      <dt>released</dt><dd>${done} of ${data.milestones} milestones</dd>
+      <dt>in vault</dt><dd>${vaultUi} tokens</dd>
+      <dt>deadline</dt><dd>${new Date(deadlineMs).toISOString().replace("T", " ").slice(0, 19)}Z ${expired ? "(passed)" : ""}</dd>
+    </dl>
+    <div class="bar"><i style="width:${pct}%"></i></div>
+  `;
+
+  // Buttons are enabled by what the CONNECTED wallet is allowed to do, so a user cannot click into a
+  // guaranteed failure. The program is the authority; this is only courtesy.
+  const isClient = me && me.equals(data.client);
+  const isFreelancer = me && data.freelancer && me.equals(data.freelancer);
+  $("acceptBtn").disabled = !(me && data.status === 0 && !data.freelancer);
+  $("approveBtn").disabled = !(isClient && data.status === 1 && data.approved < data.milestones);
+  $("claimBtn").disabled = !(isFreelancer && data.status === 1 && expired && data.approved < data.milestones);
+  $("cancelBtn").disabled = !(isClient && data.status === 0);
+  $("closeBtn").disabled = !(isClient && (data.status === 2 || data.status === 3));
+}
+
+async function withEscrow(fn, label) {
+  try {
+    if (!me) throw new Error("connect a wallet first");
+    if (!current) throw new Error("load an escrow first");
+    const sig = await fn(current);
+    log($("escrowLog"), label + " ok - tx " + sig, "ok");
+    await loadEscrow();
+  } catch (e) {
+    log($("escrowLog"), label + ": " + (e.message || e), "err");
+  }
+}
+
+/* =================================================================================================
+   WIRING
+   ================================================================================================= */
+$("walletBtn").addEventListener("click", () => connectWallet().catch((e) => log($("setupLog"), "wallet: " + e.message, "err")));
+$("demoTokenBtn").addEventListener("click", createDemoMoney);
+$("copyMintBtn").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("mint").value.trim()); log($("setupLog"), "mint copied", "ok"); }
+  catch { log($("setupLog"), "clipboard blocked by the browser", "err"); }
+});
+$("createBtn").addEventListener("click", createEscrow);
+$("loadBtn").addEventListener("click", loadEscrow);
+
+$("acceptBtn").addEventListener("click", () =>
+  withEscrow(async ({ address, data }) => {
+    // The freelancer's token account has to exist before any payout, and it is theirs to own: create
+    // it in the same transaction they sign, so they pay its rent and the client never has to.
+    const theirAta = ataFor(me, data.mint);
+    const exists = await conn.getAccountInfo(theirAta);
+    const ixs = [];
+    if (!exists) ixs.push(createAtaIx(me, me, data.mint));
+    ixs.push(acceptEscrowIx(me, address));
+    return send(ixs);
+  }, "accept")
+);
+
+$("approveBtn").addEventListener("click", () =>
+  withEscrow(({ address, data }) =>
+    send([
+      approveMilestoneIx(
+        me, address, data.freelancer, data.mint,
+        vaultPda(address), ataFor(data.freelancer, data.mint)
+      ),
+    ]), "approve milestone")
+);
+
+$("claimBtn").addEventListener("click", () =>
+  withEscrow(({ address, data }) =>
+    send([claimUnreviewedIx(me, address, data.mint, vaultPda(address), ataFor(me, data.mint))]), "claim")
+);
+
+$("cancelBtn").addEventListener("click", () =>
+  withEscrow(({ address, data }) =>
+    send([cancelEscrowIx(me, address, data.mint, vaultPda(address), ataFor(me, data.mint))]), "cancel")
+);
+
+$("closeBtn").addEventListener("click", () =>
+  withEscrow(({ address }) => send([closeEscrowIx(me, address, vaultPda(address))]), "close")
+);
+
+boot();
+</script>
+</body>
+</html>
