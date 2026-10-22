@@ -1,7 +1,7 @@
 # Submission copy
 
-Everything here is ready to paste into the listing form. Fill the three `TO DO` links once the repo is
-public, the program is deployed, and the video is recorded.
+Everything here is ready to paste into the listing form. Fill the remaining `TO DO` links once the program is
+deployed and the video is recorded.
 
 > **Check this first.** The listing says *"This listing is only open for people in Poland."* If you do not
 > hold Polish residence or citizenship, the entry is likely ineligible and no amount of packaging changes
@@ -94,7 +94,7 @@ a terms-of-service document, and all of it is 126 bytes a reader can inspect.
 
 | Field | Value |
 |---|---|
-| Repo | `TO DO — public GitHub/GitLab URL` |
+| Repo | <https://github.com/godd-ctrl/hackyeah-escrow> — public, 20 files, no keypairs tracked |
 | Live demo | `TO DO — deployed app URL (or "run locally: see README")` |
 | Video | `TO DO — ≤3 min, script in VIDEO-SCRIPT.md` |
 | Deck | `submission/deck.pdf` — 10 pages, already rendered (source: `deck.html`) |
@@ -107,8 +107,9 @@ a terms-of-service document, and all of it is 126 bytes a reader can inspect.
 - [ ] **Confirm the Poland eligibility rule** before spending time on the video.
 - [ ] `anchor build && anchor deploy --provider.cluster devnet` (or deploy via Playground) — this turns the
       one "NOT YET" on deck slide 7 into a proven row, which is worth more than any wording change.
-- [ ] Push the repo publicly. `.gitignore` already excludes `target/` and `node_modules/`; check that no
-      keypair is staged — **`git ls-files | Select-String "json"`** should only show `idl/escrow.json`.
+- [x] **Repo is public:** <https://github.com/godd-ctrl/hackyeah-escrow>. `.gitignore` excluded `target/` and
+      `node_modules/`; the remote tree was listed to confirm 20 expected blobs, and the only JSON files are
+      `idl/escrow.json`, `package.json` and `tsconfig.json` — no keypair, no `.env`, no credential.
 - [ ] Record the video from `VIDEO-SCRIPT.md`.
 - [x] **Deck PDF rendered:** `submission/deck.pdf`, 10 pages at 960×540 pt (16:9), verified by counting the
       page objects. Re-render after any edit with:
